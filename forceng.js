@@ -224,7 +224,7 @@ angular.module('forceng', [])
                         refreshToken()
                             .success(function () {
                                 // Try again with the new token
-                                request(obj)
+                                request(obj);
                             })
                             .error(function () {
                                 console.error(data);
@@ -425,7 +425,7 @@ angular.module('forceng', [])
             retrieve: retrieve,
             discardToken: discardToken,
             oauthCallback: oauthCallback
-        }
+        };
 
     });
 
