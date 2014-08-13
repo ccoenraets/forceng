@@ -61,7 +61,7 @@ This is an early version. I appreciate any feedback, comments, and help if you t
 
 ## JavaScript Version
 
-A plain JavaScript version (ForceJS) is available [here]().
+A plain JavaScript version (ForceJS) is available [here](https://github.com/ccoenraets/forcejs).
 
 ## Proxy Server
 
