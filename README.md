@@ -18,7 +18,7 @@ This is an early version. I appreciate any feedback, comments, and help if you t
 - Implemented as an AngularJS services and using promises
 - Plain JavaScript ([ForceJS]()) and Angular Service versions
 - Complete OAuth login workflow
-- Works transparently in the browser and in Cordova using the In-App browser plugin
+- Works transparently in the browser and in Cordova using the In-App browser plugin or the Salesforce Mobile SDK plugin for OAuth (coming soon)
 - Automatically refreshes OAuth access_token on expiration
 - Simple API to manipulate data (create, update, delete, upsert)   
 - Node.js or Play/Scala proxies with CORS support available separately
