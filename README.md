@@ -12,7 +12,7 @@ Visualforce page), consider using Visualforce Remoting or Remote Objects to acce
 
 This is an early version. I appreciate any feedback, comments, and help if you think this library is useful.
    
-## Key Characteristics
+### Key Characteristics
 
 - No jQuery dependency
 - Implemented as an AngularJS services and using promises
@@ -25,7 +25,7 @@ This is an early version. I appreciate any feedback, comments, and help if you t
 - Includes simple Bootstrap sample app 
 
 
-## Usage
+### Usage
 
 1. Initialize:
     ```
@@ -59,11 +59,11 @@ This is an early version. I appreciate any feedback, comments, and help if you t
         });
     ```
 
-## JavaScript Version
+### JavaScript Version
 
 A plain JavaScript version (ForceJS) is available [here](https://github.com/ccoenraets/forcejs).
 
-## Proxy Server
+### Proxy Server
 
 Because of the browser's cross-origin restrictions, your JavaScript application hosted on your own server (or localhost) will not be able to make API calls directly to the *.salesforce.com domain. The solution is to proxy your API calls through your own server. ForceNG has been tested with two proxy servers:
 - [cors-proxy](https://github.com/ccoenraets/cors-proxy): A node.js implementation
@@ -71,7 +71,7 @@ Because of the browser's cross-origin restrictions, your JavaScript application 
 
 You can use ForceNG with your own proxy server as well.
 
-## Other Libraries
+### Other Libraries
 
 - [ForceTK](https://github.com/developerforce/Force.com-JavaScript-REST-Toolkit): Proven toolkit for Salesforce REST APIs. Leverages jQuery
 - [NForce](https://github.com/kevinohara80/nforce): node.js a REST API wrapper for force.com, database.com, and salesforce.com.
