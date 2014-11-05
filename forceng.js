@@ -1,26 +1,28 @@
 /**
  * ForceNG - REST toolkit for Salesforce.com
- * Version: 0.1
+ * Author: Christophe Coenraets @ccoenraets
+ * Works with browser apps or Salesforce Mobile SDK
+ * Version: 0.4
  */
 angular.module('forceng', [])
 
     .factory('force', function ($rootScope, $q, $window, $http) {
 
-        var LOGIN_URL = 'https://login.salesforce.com',
+        var loginURL = 'https://login.salesforce.com',
 
         // The Connected App client Id
-            appId,
+            appId = '3MVG9fMtCkV6eLheIEZplMqWfnGlf3Y.BcWdOf1qytXo9zxgbsrUbS.ExHTgUPJeb3jZeT8NYhc.hMyznKU92',
 
         // The force.com API version to use. Default can be overriden in login()
-            apiVersion = 'v30.0',
+            apiVersion = 'v32.0',
 
-        // Keep track of OAuth data (mainly access_token and refresh_token)
+        // Keep track of OAuth data (access_token, instance_url, and refresh_token)
             oauth,
 
         // Only required when using REST APIs in an app hosted on your own server to avoid cross domain policy issues
-            proxyURL,
+            proxyURL = "http://localhost:8200",
 
-        // By default we store fbtoken in sessionStorage. This can be overridden in init()
+        // By default we store fbtoken in memory. This can be overridden in init()
             tokenStore = {},
 
         // if page URL is http://localhost:3000/myapp/index.html, context is /myapp
@@ -29,115 +31,154 @@ angular.module('forceng', [])
         // if page URL is http://localhost:3000/myapp/index.html, baseURL is http://localhost:3000/myapp
             baseURL = location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + context,
 
-        // if page URL is http://localhost:3000/myapp/index.html, oauthRedirectURL is http://localhost:3000/myapp/oauthcallback.html
-            oauthRedirectURL = baseURL + '/oauthcallback.html',
+        // if page URL is http://localhost:3000/myapp/index.html, oauthCallbackURL is http://localhost:3000/myapp/oauthcallback.html
+            oauthCallbackURL = baseURL + '/oauthcallback.html',
 
         // Because the OAuth login spans multiple processes, we need to keep the success/error handlers as variables
         // inside the module instead of keeping them local within the login function.
             deferredLogin,
 
-            loginProcessed,
-
         // Indicates if the app is running inside Cordova
-            runningInCordova;
+            oauthPlugin;
 
+        function parseQueryString(queryString) {
+            var qs = decodeURIComponent(queryString),
+                obj = {},
+                params = qs.split('&');
+            params.forEach(function (param) {
+                var splitter = param.split('=');
+                obj[splitter[0]] = splitter[1];
+            });
+            return obj;
+        }
 
-        document.addEventListener("deviceready", function () {
-            runningInCordova = true;
-        }, false);
+        function toQueryString(obj) {
+            var parts = [],
+                i;
+            for (i in obj) {
+                if (obj.hasOwnProperty(i)) {
+                    parts.push(encodeURIComponent(i) + "=" + encodeURIComponent(obj[i]));
+                }
+            }
+            return parts.join("&");
+        }
 
+        function refreshTokenWithPlugin(deferred) {
+            oauthPlugin.authenticate(
+                function(response) {
+                    oauth.access_token = response.accessToken;
+                    tokenStore['forceOAuth'] = JSON.stringify(oauth);
+                    deferred.resolve();
+                },
+                function() {
+                    console.log('Error refreshing oauth access token using the oauth plugin');
+                    deferred.reject();
+                });
+        }
+
+        function refreshTokenWithHTTPRequest(deferred) {
+            var params = {
+                    'grant_type': 'refresh_token',
+                    'refresh_token': oauth.refresh_token,
+                    'client_id': appId
+                },
+
+                headers = {},
+
+                url = oauthPlugin ? loginURL : proxyURL;
+
+            // dev friendly API: Remove trailing '/' if any so url + path concat always works
+            if (url.slice(-1) === '/') {
+                url = url.slice(0, -1);
+            }
+
+            url = url + '/services/oauth2/token?' + toQueryString(params);
+
+            if (!oauthPlugin) {
+                headers["Target-URL"] = loginURL;
+            }
+
+            $http({
+                headers: headers,
+                method: 'POST',
+                url: url,
+                params: params})
+                .success(function(data, status, headers, config) {
+                    console.log('Token refreshed');
+                    oauth.access_token = data.access_token;
+                    tokenStore['forceOAuth'] = JSON.stringify(oauth);
+                    deferred.resolve();
+                })
+                .error(function(data, status, headers, config) {
+                    console.log('Error while trying to refresh token');
+                    deferred.reject();
+                });
+        }
+
+        function refreshToken() {
+            var deferred = $q.defer();
+            if (oauthPlugin) {
+                refreshTokenWithPlugin(deferred);
+            } else {
+                refreshTokenWithHTTPRequest(deferred);
+            }
+            return deferred.promise;
+        }
 
         /**
-         * Initialize ForceJS
+         * Initialize ForceNG
          * @param params
-         *  appId (required)
-         *  apiVersion (optional)
+         *  appId (optional)
+         *  loginURL (optional)
          *  proxyURL (optional)
-         *  tokenStore (optional)
+         *  oauthCallbackURL (optional)
+         *  apiVersion (optional)
+         *  accessToken (optional)
+         *  instanceURL (optional)
+         *  refreshToken (optional)
          */
         function init(params) {
-            if (params.appId) {
-                appId = params.appId;
-            } else {
-                throw 'appId parameter not set in init()';
-            }
-            apiVersion = params.apiVersion || apiVersion;
-            proxyURL = params.proxyURL || proxyURL;
-            tokenStore = params.tokenStore || tokenStore;
-            oauthRedirectURL = params.oauthRedirectURL || oauthRedirectURL;
-
             // Load previously saved token
-            if (tokenStore['forceOAuth']) {
-                oauth = JSON.parse(tokenStore['forceOAuth']);
+            if (tokenStore.forceOAuth) {
+                oauth = JSON.parse(tokenStore.forceOAuth);
+            }
+
+            if (params) {
+                appId = params.appId || appId;
+                apiVersion = params.apiVersion || apiVersion;
+                tokenStore = params.tokenStore || tokenStore;
+                loginURL = params.loginURL || loginURL;
+                oauthCallbackURL = params.oauthCallbackURL || oauthCallbackURL;
+                proxyURL = params.proxyURL || proxyURL;
+
+                if (params.accessToken) {
+                    if (!oauth) oauth = {};
+                    oauth.access_token = params.accessToken;
+                }
+
+                if (params.instanceURL) {
+                    if (!oauth) oauth = {};
+                    oauth.instance_url = params.instanceURL;
+                }
+
+                if (params.refreshToken) {
+                    if (!oauth) oauth = {};
+                    oauth.refresh_token = params.refreshToken;
+                }
             }
         }
 
         /**
-         * Login to Salesforce using OAuth. If running in a Browser, the OAuth workflow happens in a a popup window.
-         * If running in Cordova container, it happens using the In-App Browser. Don't forget to install the In-App Browser
-         * plugin in your Cordova project: cordova plugins add org.apache.cordova.inappbrowser.
-         * @param success - function to call back when login succeeds
-         * @param error - function to call back when login fails
+         * Discard the OAuth access_token. Use this function to test the refresh token workflow.
          */
-        function login() {
-
-            var loginWindow,
-                startTime;
-
-            if (!appId) {
-                throw 'appId parameter not set in init()';
-            }
-
-            deferredLogin = $q.defer();
-
-            loginProcessed = false;
-
-            // Inappbrowser load start handler: Used when running in Cordova only
-            function loginWindow_loadStartHandler(event) {
-                var url = event.url;
-                if (url.indexOf("access_token=") > 0 || url.indexOf("error=") > 0) {
-                    loginProcessed = true;
-                    // When we get the access token fast, the login window (inappbrowser) is still opening with animation
-                    // in the Cordova app, and trying to close it while it's animating generates an exception. Wait a little...
-                    var timeout = 600 - (new Date().getTime() - startTime);
-                    setTimeout(function () {
-                        loginWindow.close();
-                    }, timeout > 0 ? timeout : 0);
-                    oauthCallback(url);
-                }
-            }
-
-            // Inappbrowser exit handler: Used when running in Cordova only
-            function loginWindow_exitHandler() {
-                // Handle the situation where the user closes the login window manually before completing the login process
-                if (!loginProcessed) {
-                    deferredLogin.reject({error: 'user_cancelled', error_description: 'User cancelled login process', error_reason: "user_cancelled"});
-                }
-                loginWindow.removeEventListener('loadstart', loginWindow_loadStartHandler);
-                loginWindow.removeEventListener('exit', loginWindow_exitHandler);
-                loginWindow = null;
-            }
-
-            startTime = new Date().getTime();
-            loginWindow = window.open(LOGIN_URL + '/services/oauth2/authorize?client_id=' + appId + '&redirect_uri=' + oauthRedirectURL +
-                '&response_type=token', '_blank', 'location=no');
-
-            // If the app is running in Cordova, listen to URL changes in the InAppBrowser until we get a URL with an access_token or an error
-            if (runningInCordova) {
-                loginWindow.addEventListener('loadstart', loginWindow_loadStartHandler);
-                loginWindow.addEventListener('exit', loginWindow_exitHandler);
-            }
-
-            return deferredLogin.promise;
-
-            // Note: if the app is running in the browser the loginWindow dialog will call back by invoking the
-            // oauthCallback() function. See oauthcallback.html for details.
+        function discardToken() {
+            delete oauth.access_token;
+            tokenStore.forceOAuth = JSON.stringify(oauth);
         }
 
         /**
-         * Called internally either by oauthcallback.html (when the app is running the browser) or by the loginWindow loadstart event
-         * handler defined in the login() function (when the app is running in the Cordova/PhoneGap container).
-         * @param url - The oauthRedictURL called by Salesforce at the end of the OAuth workflow. Includes the access_token in the querystring
+         * Called internally either by oauthcallback.html (when the app is running the browser)
+         * @param url - The oauthCallbackURL called by Salesforce at the end of the OAuth workflow. Includes the access_token in the querystring
          */
         function oauthCallback(url) {
 
@@ -161,6 +202,59 @@ angular.module('forceng', [])
         }
 
         /**
+         * Login to Salesforce using OAuth. If running in a Browser, the OAuth workflow happens in a a popup window.
+         */
+        function login() {
+            deferredLogin = $q.defer();
+            if (window.cordova) {
+                loginWithPlugin();
+            } else {
+                loginWithBrowser();
+            }
+            return deferredLogin.promise;
+        }
+
+        function loginWithPlugin() {
+            document.addEventListener("deviceready", function () {
+                oauthPlugin = cordova.require("com.salesforce.plugin.oauth");
+                if (!oauthPlugin) {
+                    console.error('Salesforce Mobile SDK OAuth plugin not available');
+                    if (deferredLogin) deferredLogin.reject({status: 'Salesforce Mobile SDK OAuth plugin not available'});
+                    return;
+                }
+                oauthPlugin.getAuthCredentials(
+                    function (creds) {
+                        console.log(JSON.stringify(creds));
+                        // Initialize ForceJS
+                        init({accessToken: creds.accessToken, instanceURL: creds.instanceUrl, refreshToken: creds.refreshToken});
+                        if (deferredLogin) deferredLogin.resolve();
+                    },
+                    function (error) {
+                        console.log(error);
+                        if (deferredLogin) deferredLogin.reject(error);
+                    }
+                );
+            }, false);
+        }
+
+        function loginWithBrowser() {
+            console.log('loginURL: ' + loginURL);
+            console.log('oauthCallbackURL: ' + oauthCallbackURL);
+
+            var loginWindowURL = loginURL + '/services/oauth2/authorize?client_id=' + appId + '&redirect_uri=' +
+                oauthCallbackURL + '&response_type=token';
+            window.open(loginWindowURL, '_blank', 'location=no');
+        }
+
+        /**
+         * Gets the user's ID (if logged in)
+         * @returns {string} | undefined
+         */
+        function getUserId() {
+            return (typeof(oauth) !== 'undefined') ? oauth.id.split('/').pop() : undefined;
+        }
+
+        /**
          * Check the login status
          * @returns {boolean}
          */
@@ -179,16 +273,14 @@ angular.module('forceng', [])
         function request(obj) {
 
             if (!oauth || (!oauth.access_token && !oauth.refresh_token)) {
-                if (obj.error) {
-                    obj.error('No access_token');
-                }
+                deferred.reject(data);
                 return;
             }
 
             var method = obj.method || 'GET',
                 headers = {},
-                url = proxyURL ? proxyURL : oauth.instance_url,
-                deferred = $q.defer();
+                url = oauthPlugin ? oauth.instance_url : proxyURL;
+                deferred = $q.defer('No access token. Login and try again.');
 
             // dev friendly API: Remove trailing '/' if any so url + path concat always works
             if (url.slice(-1) === '/') {
@@ -206,7 +298,7 @@ angular.module('forceng', [])
             if (obj.contentType) {
                 headers["Content-Type"] = obj.contentType;
             }
-            if (proxyURL) {
+            if (!oauthPlugin) {
                 headers["Target-URL"] = oauth.instance_url;
             }
 
@@ -238,51 +330,6 @@ angular.module('forceng', [])
                 });
 
             return deferred.promise;
-        }
-
-        function refreshToken() {
-            var params = {
-                    'grant_type': 'refresh_token',
-                    'refresh_token': oauth.refresh_token,
-                    'client_id': appId
-                },
-
-                headers = {},
-
-                url = proxyURL ? proxyURL : LOGIN_URL;
-
-            // dev friendly API: Remove trailing '/' if any so url + path concat always works
-            if (url.slice(-1) === '/') {
-                url = url.slice(0, -1);
-            }
-
-            url = url + '/services/oauth2/token?' + toQueryString(params);
-
-            if (proxyURL) {
-                headers["Target-URL"] = LOGIN_URL;
-            }
-
-            return $http({
-                headers: headers,
-                method: 'POST',
-                url: url,
-                params: params})
-                .success(function(data, status, headers, config) {
-                    console.log('Token refreshed');
-                    oauth.access_token = data.access_token;
-                    tokenStore['forceOAuth'] = JSON.stringify(oauth);
-                })
-                .error(function(data, status, headers, config) {
-                    console.log('Error while trying to refresh token');
-                });
-        }
-
-        /**
-         * Discard the OAuth access_token. Use this function to test the refresh token workflow.
-         */
-        function discardToken() {
-            delete oauth.access_token;
-            tokenStore['forceOAuth'] = JSON.stringify(oauth);
         }
 
         /**
@@ -341,7 +388,7 @@ angular.module('forceng', [])
         function update(objectName, data) {
 
             var id = data.Id,
-               fields = angular.copy(data);
+                fields = angular.copy(data);
 
             delete fields.attributes;
             delete fields.Id;
@@ -390,31 +437,11 @@ angular.module('forceng', [])
 
         }
 
-        function parseQueryString(queryString) {
-            var qs = decodeURIComponent(queryString),
-                obj = {},
-                params = qs.split('&');
-            params.forEach(function (param) {
-                var splitter = param.split('=');
-                obj[splitter[0]] = splitter[1];
-            });
-            return obj;
-        }
-
-        function toQueryString(obj) {
-            var parts = [];
-            for (var i in obj) {
-                if (obj.hasOwnProperty(i)) {
-                    parts.push(encodeURIComponent(i) + "=" + encodeURIComponent(obj[i]));
-                }
-            }
-            return parts.join("&");
-        }
-
         // The public API
         return {
             init: init,
             login: login,
+            getUserId: getUserId,
             isLoggedIn: isLoggedIn,
             request: request,
             query: query,
