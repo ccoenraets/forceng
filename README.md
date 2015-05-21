@@ -70,7 +70,7 @@ To create and run a minimalistic sample app using ForceNG:
 
     That's it! This is all you need to authenticate with OAuth, retrieve a list of contacts from Salesforce, and display that list in HTML.
     
-        > The ```<script src="cordova.js"></script>``` line is there to support running the app in Cordova. Note that the ```cordova.js``` file does not have to be present in your directory: it is automatically injected by the Cordova build process. If you know you will never run your app in Cordova, feel free to remove that line.
+    > The ```<script src="cordova.js"></script>``` line is there to support running the app in Cordova. Note that the ```cordova.js``` file does not have to be present in your directory: it is automatically injected by the Cordova build process. If you know you will never run your app in Cordova, feel free to remove that line.
 
 1. Install force-server
 
