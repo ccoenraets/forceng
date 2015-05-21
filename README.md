@@ -1,5 +1,5 @@
 # ForceNG
-### REST Library for the Salesforce Platform 
+### AngularJS Service for using the Salesforce REST APIs 
 
 ForceNG is a micro-library that makes it easy to use the Salesforce REST APIs in AngularJS applications.
 ForceNG allows you to easily login into Salesforce using OAuth, and to manipulate your Salesforce data using a simple
