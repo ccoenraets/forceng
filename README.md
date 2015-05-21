@@ -1,114 +1,578 @@
 # ForceNG
+### REST Library for the Salesforce Platform 
 
-ForceNG is a micro-library that makes it easy to use the Salesforce REST APIs in AngularJS applications. 
-ForceNG allows you to easily login into Salesforce using OAuth, and to access your Salesforce data using a simple 
+ForceNG is a micro-library that makes it easy to use the Salesforce REST APIs in AngularJS applications.
+ForceNG allows you to easily login into Salesforce using OAuth, and to manipulate your Salesforce data using a simple
 API.
 
-ForceNG is similar to [ForceTK](https://github.com/developerforce/Force.com-JavaScript-REST-Toolkit), but has no jQuery dependency, is implemented as an AngularJS service, and is using promises instead of callback functions. 
+ForceNG is similar to [ForceTK](https://github.com/developerforce/Force.com-JavaScript-REST-Toolkit), but has no jQuery dependency, is implemented as an AngularJS service, and is using promises instead of callback functions.
 
-The main target for ForceNG are applications running on your own server (Heroku or elsewhere), or locally on a 
-mobile device and accessing Salesforce through REST services. If your application is hosted inside Salesforce (in a 
-Visualforce page), consider using Visualforce Remoting or Remote Objects to access your Salesforce data.  
+The main target for ForceNG are applications running on your own server (Heroku or elsewhere) and Cordova/Mobile SDK apps.  
 
-This is an early version. I appreciate any feedback, comments, and help if you think this library is useful.
-   
-### Key Characteristics
+## Browser and Cordova without Code Changes
 
-- No jQuery dependency
+If you develop a hybrid application using the Mobile SDK, you often switch back and forth between running the app in the browser and on device: Developing in the browser is generally faster and easier to debug, but you still need to test device-specific features and check that everything runs as expected on the target platforms. The problem is that the configuration of OAuth and REST is different when running in the browser and on device. Here is a summary of the key differences:
+
+<table>
+<tr><td></td><td><strong>Browser</strong></td><td><strong>Mobile SDK</strong></td></tr>
+<tr><td>Requires Proxy</td><td>Yes</td><td>No</td></tr>
+<tr><td>OAuth</td><td>Window Popup</td><td>OAuth Plugin</td></tr>
+</table>
+
+ForceNG abstracts these differences and allows you to run your app in the browser and on device without code or configuration changes.
+ 
+## Key Characteristics
+
+- No jQuery (or any other) dependency
 - Implemented as an AngularJS services and using promises
 - Plain JavaScript ([ForceJS](https://github.com/ccoenraets/forcejs)) and Angular Service versions
 - Complete OAuth login workflow
-- Works transparently in the browser and in Cordova using the In-App browser plugin or the Salesforce Mobile SDK plugin for OAuth (coming soon)
+- Works transparently in the browser and in Cordova using the Salesforce Mobile SDK OAuth plugin
 - Automatically refreshes OAuth access_token on expiration
-- Simple API to manipulate data (create, update, delete, upsert)   
-- Node.js or Play/Scala proxies with CORS support available separately
-- Includes simple Bootstrap sample app 
+- Tightly integrated with [ForceServer](https://github.com/ccoenraets/force-server), a local development server that works as a proxy and a local web server to provide a streamlined developer experience
+- Simple API to manipulate data (create, update, delete, upsert)
 
+## Quick Start
 
-### Usage
+To create and run a minimalistic sample app using ForceNG:
 
-1. Initialize (Optional):
-
-    ForceJS is built to work out of the box with sensible defaults. **You only need to invoke force.init() if you want to override these defaults**: 
+1. Create a directory anywhere on your file system, copy forceng.js in that directory, and create a file named index.html implemented as follows:
 
     ```
-    force.init({
-        appId: '3MVG9fMtCkV6eLheIEZplMqWfnGlf3Y.BcWdOf1qytXo9zxgbsrUbS.ExHTgUPJeb3jZeT8NYhc.hMyznKU92',
-        apiVersion: 'v32.0',
-        loginUrl: 'https://login.salesforce.com',
-        oauthRedirectURL: 'http://localhost:8200/oauthcallback.html',
-        proxyURL: 'http://localhost:8200'
-    });
-    ```
-       
-2. Login:
-    ```
-    force.login().then(
-        function () {
-            console.log('Login succeeded');
-        },
-        function () {
-            alert('Login failed');
-        });
-    ```
-
-3. Invoke a function: query(), create(), update(), delete(), upsert(), or the generic request():
-    ```
-    force.query('select id, firstName, lastName from contact').then(
-        function (contacts) {
-            $scope.contacts = contacts.records;
-        },
-        function() {
-            alert("An error has occurred");
-        });
-    ```
-
-### ForceServer
-
-Because of the browser's cross-origin restrictions, your JavaScript application hosted on your own server (or localhost) will not be able to make API calls directly to the *.salesforce.com domain. The solution is to proxy your API calls through your own server. You can use your own proxy server, but to provide an integrated development experience, ForceJS works smoothly with ForceServer, a simple development server for Force.com. It provides two main features: 
-
-- **A Proxy Server** to avoid cross-domain policy issues when invoking Salesforce REST services. (The Chatter API supports CORS, but other APIs don’t yet)
-- **A Local Web Server** to (1) serve the OAuth callback URL defined in your Connected App, and (2) serve the whole app during development and avoid cross-domain policy issues when loading files (for example, templates) from the local file system.
-
-Visit the [force-server repository](https://github.com/ccoenraets/force-server) for more information.
-
-You can use ForceNG with your own proxy server as well.
-
-### Run the Server
-
-Navigate to the directory where you created index.html, and type:
-
-```
-force-server
-``` 
+    <html>
+    <body ng-app="miniApp">
     
-This command will start the server on port 8200, and automatically load your app (http://localhost:8200) in a browser window. You'll see the Salesforce login window, and the list of contacts will appear after you log in.
+    <ul ng-controller="ContactListCtrl">
+        <li ng-repeat="contact in contacts" href="#">{{contact.Name}}</li>
+    </ul>
+    
+    <script src="cordova.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
+    <script src="forceng.js"></script>
+    
+    <script>
+        angular.module('miniApp', ["forceng"])
+    
+            .controller('ContactListCtrl', function ($scope, force) {
+                force.login().then(function () {
+                    force.query('select id, name from contact limit 50').then(
+                        function (contacts) {
+                            $scope.contacts = contacts.records;
+                            console.log($scope.contacts);
+                        });
+                });
+            });
+    
+    </script>
+    </body>
+    </html>
+    ```
 
-You can change the port number and the web root. Type the following command for more info:
+    That's it! This is all you need to authenticate with OAuth, retrieve a list of contacts from Salesforce, and display that list in HTML.
+    
+        > The ```<script src="cordova.js"></script>``` line is there to support running the app in Cordova. Note that the ```cordova.js``` file does not have to be present in your directory: it is automatically injected by the Cordova build process. If you know you will never run your app in Cordova, feel free to remove that line.
+
+1. Install force-server
+
+    Because of the browser's cross-origin restrictions, your JavaScript application hosted on your own server (or localhost) will not be able to make API calls directly to the *.salesforce.com domain. The solution is to proxy your API calls through your own server. You can use your own proxy server, but ForceNG is tightly integrated with [ForceServer](https://github.com/ccoenraets/force-server), a simple development server for Force.com. To install ForceServer, make sure Node.js is installed on your system, open a command prompt and execute the following command:
+
+    ```
+    npm install -g force-server
+    ```
+
+    or (Unix-based systems)
+
+    ```
+    sudo npm install -g force-server
+    ```
+
+1. Run the application.
+
+    Open a command prompt, navigate to your sample app directory and type the following command:
+
+    ```
+    force-server
+    ```
+
+    This starts the ForceServer server on port 8200 and loads your sample app in your default browser. After authenticating against your developer org, you should see a list of contacts. 
+
+
+## Running in Cordova with the Mobile SDK
+
+To run the same application in Cordova:
+
+1. Install Cordova:
+
+    ```
+    npm install -g cordova
+    ```
+    
+    On a Mac, you may have to use sudo:
+
+    ```
+    sudo npm install -g cordova
+    ```
+
+1. Create a new application:
+
+    ```
+    cordova create contactforce com.samples.contactforce contactforce
+    ```
+    
+1. Navigate (cd) to the project directory
+
+    ```
+    cd contactforce
+    ```
+
+1. Add the Salesforce Mobile SDK plugin:
+
+    ```
+    cordova plugin add https://github.com/forcedotcom/SalesforceMobileSDK-CordovaPlugin
+    ```
+
+1. Delete the contents of the ```contactforce/www``` directory
+
+1. Copy ```forceng.js``` and the ```index.html``` file created above in the ```contactforce/www``` directory
+
+1. Create a file named bootconfig.json (the Salesforce Mobile SDK config file) in the ```contactforce/www``` directory and implement it as follows:
+
+    ```
+    {
+      "remoteAccessConsumerKey": "3MVG9Iu66FKeHhINkB1l7xt7kR8czFcCTUhgoA8Ol2Ltf1eYHOU4SqQRSEitYFDUpqRWcoQ2.dBv_a1Dyu5xa",
+      "oauthRedirectURI": "testsfdc:///mobilesdk/detect/oauth/done",
+      "oauthScopes": [
+        "web",
+        "api"
+      ],
+      "isLocal": true,
+      "startPage": "index.html",
+      "errorPage": "error.html",
+      "shouldAuthenticate": true,
+      "attemptOfflineLoad": false
+    }
+    ```
+    
+    > For a production application, you should create a Connected App in Salesforce and provide your own Connected App ID and Callback URI.
+
+6. Add a platform. For example, to add iOS:
+
+    ```
+    cordova platform add ios
+    ```
+    
+7. Build the project:
+
+    ```
+    cordova build ios
+    ```
+
+Run the project. For example, for iOS, open the project (platforms/ios/contactforce.xcodeproj) in Xcode and run it in the emulator or on your iOS device. After authenticating against your developer org, you should see a list of contacts.  
+
+> Note that you didn't change any code to run the app in Cordova. When running in Cordova, ForceNG automatically uses the Salesforce Mobile SDK OAuth plugin, and invokes REST services without using a proxy because the webview used in Cordova is not subject to the same cross domain policy restrictions.
+
+## Ionic Salesforce Template
+
+[Ionic](http://ionicframework.com/) is an open source front-end SDK for developing hybrid mobile apps on top of AngularJS. The Ionic Salesforce Template is a starter 
+application for building Ionic apps on top of the Salesforce platform. The template installs a starter application that uses ForceNG to authenticate and access the Salesforce REST APIs.
+
+To create an application using the Ionic Salesforce Template:
+
+1. Install Cordova and Ionic:
+
+    ```
+    $ sudo npm install -g ionic cordova
+    ```
+    
+1. Create the app:    
+
+    ```
+    $ ionic start myApp salesforce
+    ```
+
+1. To run the app in the browser:
+
+    ```
+    cd myApp/www
+    force-server
+    ```
+    
+1. To run the app on device, ```cd``` back to the project root directory and execute the following command:
+    
+    ```
+    ionic build ios    
+    ```
+
+1. Open the project (platforms/ios/myApp.xcodeproj) in Xcode and run it in the emulator or on your iOS device. 
+
+
+## Other Sample
+
+- Contact Management with Bootstrap: A complete contact management sample (Retrieve, Create, Update, Delete) shipping with this repository
+
+## Using ForceNG in Visualforce Pages
+
+Even though you should consider Visualforce Remoting or Remote Objects to avoid the governor limits related to the REST APIs, you can run ForceNG in Visualforce pages. To run a Visualforce page version of the sample above, upload forceng.js as a static resource and create a Visualforce page defined as follows: 
 
 ```
-force-server --help
+<apex:page>
+    
+    <body ng-app="miniApp">
+    
+    <ul ng-controller="ContactListCtrl">
+        <li ng-repeat="contact in contacts" href="#">{{contact.Name}}</li>
+    </ul>
+    
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
+    <script src="{!$Resource.forceng}"></script>
+    
+    <script>
+        // Keep this in the VF page to capture the Session Id and store it in an Angular Constant
+        angular.module('config', [])
+        	.constant('SESSION_ID', '{!$Api.Session_ID}');
+	</script>    
+        
+	<script>
+        // This is typically in a separate file like app.js
+        angular.module('miniApp', ['forceng', 'config'])
+
+            .controller('ContactListCtrl', function ($scope, force, SESSION_ID) {
+                force.init({accessToken: SESSION_ID});
+                force.query('select id, name from contact limit 50').then(
+                    function (contacts) {
+                        $scope.contacts = contacts.records;
+                        console.log($scope.contacts);
+                    });
+            });
+    </script>
+
+    </body>
+
+</apex:page>
 ```
 
-### Transparently Running Hybrid Apps on Device and in the Browser
+Notice that in this case, you don't have to login: you just initialize ForceNG with the existing session id.
 
-If you develop a hybrid application using the Mobile SDK, you often switch back and forth between running the app in the browser and on device: Developing in the browser is generally faster and easier to debug, but you still need to test device-specific features and check that everything runs as expected on the target platforms. The problem is that the configuration of OAuth and REST is different when running in the browser and on-device. Here is a summary of the key differences:
+## API Reference
 
-<table>
-<tr><td></td><td><strong>Browser</strong></td><td><strong>Device</strong></td></tr>
-<tr><td>Proxy</td><td>Yes</td><td>No</td></tr>
-<tr><td>OAuth</td><td>Popup</td><td>Plugin</td></tr>
-</table>
+### init()
 
-ForceJS abstracts these differences and allows you to run your app in the browser and on device without code or configuration change.
+Used to initialize ForceNG with non-default parameters. ForceNG is built to work out of the box with sensible defaults. **You only need to invoke force.init() if you want to override these defaults**:
 
-### JavaScript Version
+Parameters:
+
+- **appId**
+
+    The Salesforce Connected App Id. For convenience, ForceNG uses a default connected app if the appId is not provided. The default connected app supports http://localhost:8200/oauthcallback.html as the OAuth callback URL to provide an out-of-the-box development experience using force-server. You need to create your own connected app with your own OAuth callback URL to run your application on a different server and port.
+
+    *Default*: **3MVG9fMtCkV6eLheIEZplMqWfnGlf3Y.BcWdOf1qytXo9zxgbsrUbS.ExHTgUPJeb3jZeT8NYhc.hMyznKU92**.
+
+- **oauthCallbackURL**
+
+    The URL Salesforce calls back with an authenticated access token (or an error) at the end of the OAuth authentication workflow.
+
+    *Default*: The base URL the application was loaded from. For example, if you load the app from http://localhost:8200, the default OAuth callback URL is http://localhost:8200/oauthcallback.html. If you load the app from https://myserver.com/myapp, the default OAuth callback URL is https://myserver.com/myapp/oauthcallback.html
+
+
+- **proxyURL**
+
+    The URL of the CORS proxy server. This parameter is ignored when the app is running in Cordova or inside a Visualforce page. 
+    
+    *Default*: The base URL the application was loaded from. For example, if you load the app from http://localhost:8200, the default proxyURL is http://localhost:8200. If you load the app from https://myserver.com/myapp, the default proxyURL is https://myserver.com/myapp
+
+- **useProxy**
+
+    *Default*: **false** if the app is running in Cordova or in a Visualforce page, **true** if it's not 
+
+    By default, ForceNG will automatically determine if it needs to use a CORS proxy: It won't use a proxy if the app is running inside a Visualforce page or a Cordova app, and will use the proxy in any other case. You can force ForceNG to always use a proxy by setting this value to true.
+
+- **loginURL**
+
+    The URL for the login window that should be used as part of the OAuth process.
+
+    *Default*: https://login.salesforce.com
+
+
+- **apiVersion**
+
+    The version of the Salesforce API.
+
+    *Default*: v33.0
+
+
+Use the following init parameters, if you don't need to authenticate the user because you already have an authenticated token. For example, if you are running the app from a Visualforce page. **accessToken** is the only required parameter in that scenario.
+
+
+- **accessToken**
+
+    *Default*: n/a
+
+    The authenticated access token
+
+- **instanceURL**
+
+    *Default*: n/a
+
+    The Salesforce instance URL
+
+- **refreshToken**
+
+    *Default*: n/a
+
+    The refresh token
+
+Example:
+```
+force.init({
+    appId: '3MVG9fMtCkV6eLheIEZplMqWfnGlf3Y.BcWdOf1qytXo9zxgbsrUbS.ExHTgUPJeb3jZeT8NYhc.hMyznKU92',
+    apiVersion: 'v33.0',
+    loginURL: 'https://login.salesforce.com',
+    oauthRedirectURL: 'http://localhost:8200/oauthcallback.html',
+    proxyURL: 'http://localhost:8200'
+});
+```
+
+
+### query()
+
+Used to execute a SOQL statement
+
+Example:
+
+```
+force.query("SELECT id, name FROM contact").then(
+    function(result) {
+        console.log(result.records);
+    ), function(error) {
+        console.log(error);
+    });
+```
+
+### create()
+
+Used to create a record for a Salesforce object
+
+Example:
+
+```
+force.create('contact', {FirstName: "Lisa", LastName: "Jones"}).then(
+    function(response) {
+        console.log(response);
+    },
+    function(error) {
+        console.log(error);
+    });
+```
+
+### update()
+
+Used to update a record
+
+Example:
+
+```
+force.update('contact', {Id: "0031a000001x7DOAAY", FirstName: "Emma", LastName: "Wong"}).then(
+    function(response) {
+        console.log(response);
+    },
+    function(error) {
+        console.log(error);
+    });
+```
+
+### del()
+
+Used to delete a record
+
+Example:
+
+```
+force.del('contact', "0031a000001x7DOAAY").then(
+    function(response) {
+        console.log(response);
+    },
+    function(error) {
+        console.log(error);
+    });
+```
+
+### upsert()
+
+Used to upsert a record
+
+Example:
+
+```
+force.query("SELECT id, name FROM contact").then(
+    function(result) {
+    ),
+    function(error) {
+    });
+```
+
+### retrieve()
+
+Used to retrieve a single record
+
+Example:
+
+```
+force.retrieve('contact', id, null).then(
+    function(contact) {
+        console.log(contact);
+    },
+    function(error) {
+        console.log(error);
+    });
+```
+
+### apexrest()
+
+Used to invoke a custom REST service endpoint implemented by your own Apex class.
+
+Example:
+
+```
+force.apexrest("contacts").then(
+    function(result) {
+        console.log(result)
+    ),
+    function(error) {
+        console.log(error);
+    });
+```
+
+### request()
+
+The core method to invoke a REST services. Other functions (query, create, update, del, upsert, apexrest) are just convenience functions invoking request() behind the scenes. You can use request() directly to invoke other REST services that are not directly exposed through a convenience function.
+
+Example:
+
+```
+force.request({path: "/services/data"}).then(
+    function(result) {
+        console.log(result)
+    ),
+    function(error) {
+        console.log(error);
+    });
+```
+
+Parameters:
+
+- **path**
+
+    The path of the service to invoke
+
+- **method**
+
+    The HTTP method to execute: GET, POST, PUT, DELETE, PATCH
+
+    *Default*: GET
+    
+- **contentType**     
+
+    The request content type.
+
+
+- **params**
+    
+    An object that will be turned into a query string appended to the request URL
+     
+- **data**
+     
+    An object representing data to be sent as the body of the request.
+     
+
+### isAuthenticated()
+
+Used to figure out if the user is authenticated, in other words ForceNG has an authenticated access token.
+
+Example:
+
+```
+alert(force.isLoggedIn());
+```
+
+### getUserId()
+
+Used to get the authenticated user's id
+
+Example:
+
+```
+alert("The current user is: " + force.getUserId());
+```
+
+### discardToken()
+
+Used to discard the authentication token.
+
+Example:
+
+```
+force.discardToken();
+```
+
+### chatter()
+
+A convenience function to use the Chatter API
+
+Example:
+
+```
+force.chatter({path: "/users/me"}).then(
+    function(result) {
+        console.log(result)
+    ),
+    function(error) {
+        console.log(error);
+    });
+```
+
+Parameters:
+
+- **path**
+
+    The path of the Chatter API service to invoke
+
+- **method**
+
+    The HTTP method to execute: GET, POST, PUT, DELETE, PATCH
+
+    *Default*: GET
+    
+- **contentType**     
+
+    The request content type.
+
+
+- **params**
+    
+    An object that will be turned into a query string appended to the request URL
+     
+- **data**
+     
+    An object representing data to be sent as the body of the request.
+
+
+## JavaScript Version
 
 A plain JavaScript version (ForceJS) is available [here](https://github.com/ccoenraets/forcejs).
 
-### Other Libraries
+## Other Libraries
 
-- [ForceTK](https://github.com/developerforce/Force.com-JavaScript-REST-Toolkit): Proven toolkit for Salesforce REST APIs. Leverages jQuery
-- [NForce](https://github.com/kevinohara80/nforce): node.js a REST API wrapper for force.com, database.com, and salesforce.com.
-- [ngForce](https://github.com/noeticpenguin/ngForce): Streamlined Visualforce Remoting integration in your AngularJS apps running in a Visualforce page  
+ForceNG was built based on the following requirements:
+
+- Client-side REST library 
+- Minimalistic with no dependency
+- Full OAuth workflow
+- Browser and Cordova-based execution without code or configuration changes
+- Built the Angular way: implemented as an Angular service and working with promises instead of callbacks
+
+Depending on your own requirements, you should also consider the following libraries:  
+
+- [ForceTK](https://github.com/developerforce/Force.com-JavaScript-REST-Toolkit): Proven toolkit for Salesforce REST APIs. Leverages jQuery.
+- [NForce](https://github.com/kevinohara80/nforce): node.js REST API wrapper for force.com, database.com, and salesforce.com.
+- [ngForce](https://github.com/noeticpenguin/ngForce): A set of Angular.js modules that facilitate quick and sustainable Angular.js application development on the Force.com Platform. 
 - [JSForce](http://jsforce.github.io/): Integrate your JavaScript application with Salesforce in different scenarios
