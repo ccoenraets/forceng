@@ -96,7 +96,7 @@ To create and run a minimalistic sample app using ForceNG:
 
     This starts the ForceServer server on port 8200 and loads your sample app in your default browser. After authenticating against your developer org, you should see a list of contacts. 
     
-    > Starting in the Spring 15 release, some Salesforce REST APIs (like Chatter and sobjects) support CORS. To allow an app to make direct REST calls against your org, register the app domain in Setup: Administer > Security Controls > CORS.
+> Starting in the Spring 15 release, some Salesforce REST APIs (like Chatter and sobjects) support CORS. To allow an app to make direct REST calls against your org, register the app domain in Setup: Administer > Security Controls > CORS.
 
 
 ## Running in Cordova with the Mobile SDK
