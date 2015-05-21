@@ -173,12 +173,19 @@ Run the project. For example, for iOS, open the project (platforms/ios/contactfo
 
 ## Ionic Salesforce Template
 
-[Ionic](http://ionicframework.com/) is an open source front-end SDK for developing hybrid mobile apps on top of AngularJS. The Ionic Salesforce Template is a starter 
+[Ionic](http://ionicframework.com/) is an open source SDK for developing hybrid mobile apps on top of AngularJS. The Ionic Salesforce Template is a starter 
 application for building Ionic apps on top of the Salesforce platform. The template installs a starter application that uses ForceNG to authenticate and access the Salesforce REST APIs.
 
 To create an application using the Ionic Salesforce Template:
 
 1. Install Cordova and Ionic:
+
+    ```
+    $ npm install -g ionic cordova
+    ```
+    
+    On a Mac, you may have to use sudo:
+
 
     ```
     $ sudo npm install -g ionic cordova
@@ -251,7 +258,7 @@ Even though you should consider Visualforce Remoting or Remote Objects to avoid 
 </apex:page>
 ```
 
-Notice that in this case, you don't have to login: you just initialize ForceNG with the existing session id.
+> Notice that in this case, you don't have to login: you just initialize ForceNG with the existing session id.
 
 ## API Reference
 
